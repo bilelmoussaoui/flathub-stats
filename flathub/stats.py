@@ -29,6 +29,8 @@ def get_cache_path(date: datetime.date) -> Path:
 
 def cache_downloads_stats(date: datetime.date):
     cache_path = get_cache_path(date)
+    if date in MISSING_DATES:
+        return
     if not cache_path.exists():
         endpoint = f'{BASE_URI}/{date.year}/{date.month:02d}/{date.day:02d}.json'
         res = requests.get(endpoint)
@@ -55,6 +57,9 @@ def download_cache(start_date: datetime.date, end_date: datetime.date):
 
 def parse_cache_of_date(date: datetime.date) -> [ApplicationHistory]:
     history = []
+    if date in MISSING_DATES:
+        return history
+
     cache_path = get_cache_path(date)
 
     with open(cache_path, 'r') as handle:
@@ -75,15 +80,19 @@ def parse_cache_of_date(date: datetime.date) -> [ApplicationHistory]:
 
 
 if __name__ == '__main__':
+    connection = sqlite3.connect(DATABASE_PATH)
+
+    connection.execute(Application.scheme)
+    connection.execute(ApplicationHistory.scheme)
 
     today = datetime.date.today()
     end_date = datetime.date(today.year, today.month, today.day)
 
     applications = {}
 
+    download_cache(START_DATE, end_date)
+
     for date in iter_to_date(START_DATE, end_date):
-        if date in MISSING_DATES:
-            continue
         try:
             date_history = parse_cache_of_date(date)
             for app_history in date_history:
@@ -93,8 +102,6 @@ if __name__ == '__main__':
                 applications[app_history.app_id] = application
         except FileNotFoundError:
             logger.error(f'Failed to find cache file {date}')
-
-    connection = sqlite3.connect(DATABASE_PATH)
 
     for app in applications.values():
         cursor = connection.cursor()

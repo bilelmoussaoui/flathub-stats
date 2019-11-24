@@ -3,6 +3,12 @@ import sqlite3
 
 
 class Application:
+    scheme = """
+                CREATE TABLE IF NOT EXISTS `applications` (
+                    `id` INTEGER PRIMARY KEY,
+                    `app_id` TEXT NOT NULL UNIQUE
+                );
+            """
     app_id: str
     _id: int
     _history: ['ApplicationHistory']
@@ -13,17 +19,30 @@ class Application:
         self._id = kwargs.get('id', -1)
 
     @staticmethod
+    def all(connection: sqlite3.Connection) -> ['Application']:
+        query = 'SELECT * FROM applications'
+
+        cursor = connection.cursor()
+        cursor.execute(query, ())
+        rows = cursor.fetchall()
+        return [Application._from_row(row, connection) for row in rows]
+
+    @staticmethod
     def from_app_id(app_id: str, connection: sqlite3.Connection) -> 'Application':
-        app = None
         cursor = connection.cursor()
         query = 'SELECT * FROM applications WHERE app_id=?'
         cursor.execute(query, (app_id, ))
         row = cursor.fetchone()
+
+        return Application._from_row(row, connection)
+
+    @staticmethod
+    def _from_row(row, connection: sqlite3.Connection):
+        app = None
         if row:
             _id, app_id = row
             history = ApplicationHistory.from_app_id(_id, app_id, connection)
             app = Application(app_id, id=_id, history=history)
-
         return app
 
     def to_json(self) -> dict:
@@ -63,6 +82,14 @@ class Application:
 
 
 class ApplicationHistory:
+    scheme = """
+                CREATE TABLE IF NOT EXISTS `applications_history` (
+                    `application_id` INTEGER NOT NULL,
+                    `date` DATE,
+                    `downloads` INTEGER DEFAULT 0,
+                    `updates` INTEGER DEFAULT 0
+                );
+            """
     app_id: str
     _application_id: int
     date: datetime.date
